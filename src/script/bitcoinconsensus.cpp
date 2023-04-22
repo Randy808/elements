@@ -74,29 +74,55 @@ static bool verify_flags(unsigned int flags)
     return (flags & ~(bitcoinconsensus_SCRIPT_FLAGS_VERIFY_ALL)) == 0;
 }
 
+
+//RANDY_COMMENTED
 static int verify_script(const unsigned char *hash_genesis_block,
                                     const unsigned char *scriptPubKey, unsigned int scriptPubKeyLen, CConfidentialValue amount,
                                     const unsigned char *txTo        , unsigned int txToLen,
                                     unsigned int nIn, unsigned int flags, bitcoinconsensus_error* err)
 {
+    //If verify flags is not true
     if (!verify_flags(flags)) {
+        //Return an error about there being invalid flags
         return set_error(err, bitcoinconsensus_ERR_INVALID_FLAGS);
     }
     try {
+        //Create a tx input stream
         TxInputStream stream(PROTOCOL_VERSION, txTo, txToLen);
+
+        //Create a tx by passing in a deserializer and the tx stream
         CTransaction tx(deserialize, stream);
+
+        //If the inputs arg is bigger than the tx data received in txTo
         if (nIn >= tx.vin.size())
+            //Set and return error
             return set_error(err, bitcoinconsensus_ERR_TX_INDEX);
+
+        //If the size of txTo is bigger than reported in arg
         if (GetSerializeSize(tx, PROTOCOL_VERSION) != txToLen)
+            //Set and return an error about size mismatch
             return set_error(err, bitcoinconsensus_ERR_TX_SIZE_MISMATCH);
 
+        //E
         // Regardless of the verification result, the tx did not error.
+        //EE
+
+        //set an error to say everything is okay
         set_error(err, bitcoinconsensus_ERR_OK);
 
+        //Get the hash of genesis block in arg or set to empty
         auto hash_genesis_block_ = hash_genesis_block ? uint256{hash_genesis_block, 32} : uint256{};
+
+        //Initialize txdata using the hash genesis block
         PrecomputedTransactionData txdata(hash_genesis_block_);
+
+        //Initialize the data with the tx data created from txTo arg
         txdata.Init(tx, {});
+
+        //Pass in the witness for the input in pScriptWitness if there is one
         const CScriptWitness* pScriptWitness = (tx.witness.vtxinwit.size() > nIn ? &tx.witness.vtxinwit[nIn].scriptWitness : NULL);
+
+        //And verify the script
         return VerifyScript(tx.vin[nIn].scriptSig, CScript(scriptPubKey, scriptPubKey + scriptPubKeyLen), pScriptWitness, flags, TransactionSignatureChecker(&tx, nIn, amount, txdata, MissingDataBehavior::FAIL), nullptr);
     } catch (const std::exception&) {
         return set_error(err, bitcoinconsensus_ERR_TX_DESERIALIZE); // Error deserializing

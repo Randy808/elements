@@ -30,21 +30,38 @@ typedef enum tag_t
 , WORD
 } tag_t;
 
+//E
 /* This structure is use to count the different kinds of combinators in a Simplicity DAG. */
+//EE
 typedef struct combinator_counters {
   size_t comp_cnt, case_cnt, pair_cnt, disconnect_cnt,
          injl_cnt, injr_cnt, take_cnt, drop_cnt;
 } combinator_counters;
 
+
+//E
 /* Given a tag for an expression, add it to the 'census'.
  */
+//EE
+
+//RANDY_COMMENTED
+//Increments the count of combinator for the given tag
 static inline void enumerator(combinator_counters* census, tag_t tag) {
+  //If the combinator is not defined, return
   if (!census) return;
+
+  //Switch the tag on the dag
   switch (tag) {
+  //If it's COMP then increment the comp (computational?) combinator count and return
    case COMP: census->comp_cnt++; return;
+
+   //If assertion then increment the case combinator count
    case ASSERTL:
    case ASSERTR: /* Assertions are counted as CASE combinators. */
    case CASE: census->case_cnt++; return;
+
+
+   //All these have custom combinator counts
    case PAIR: census->pair_cnt++; return;
    case DISCONNECT: census->disconnect_cnt++; return;
    case INJL: census->injl_cnt++; return;
@@ -52,7 +69,11 @@ static inline void enumerator(combinator_counters* census, tag_t tag) {
    case TAKE: census->take_cnt++; return;
    case DROP: census->drop_cnt++; return;
 
+    //E
    /* These tags are not accounted for in the census. */
+   //EE
+
+   //No combinator count for these
    case IDEN:
    case UNIT:
    case HIDDEN:

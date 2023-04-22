@@ -2540,47 +2540,94 @@ uint256 GetRangeproofsHash(const T& txTo) {
 
 } // namespace
 
+//RANDY_COMMENTED
 template <class T>
 void PrecomputedTransactionData::Init(const T& txTo, std::vector<CTxOut>&& spent_outputs, bool force)
 {
+    //Assert that the m_spent_outputs_ready is false
     assert(!m_spent_outputs_ready);
 
+    //Move the spent outputs to m_spent_outputs
     m_spent_outputs = std::move(spent_outputs);
+
+    //If the spent outputs is *not* empty
     if (!m_spent_outputs.empty()) {
+        //Assert that the spent outputs size is equal to the inputs in our current tx
         assert(m_spent_outputs.size() == txTo.vin.size());
+
+        //mark the spent outputs as ready
         m_spent_outputs_ready = true;
     }
 
+    //E
     // Determine which precomputation-impacting features this transaction uses.
+    //EE
+
+    //Set whether we use bip143 using arg
     bool uses_bip143_segwit = force;
+
+    //Set whether we use bip341 using arg
     bool uses_bip341_taproot = force;
+
+    //For input positions in the txs input, AND as long as bip143 AND bip341 isn't being used, incremeent the input position
     for (size_t inpos = 0; inpos < txTo.vin.size() && !(uses_bip143_segwit && uses_bip341_taproot); ++inpos) {
+        //If the input position is less than the size of the witnesses AND the tx's witness at that position is null
         if (inpos < txTo.witness.vtxinwit.size() && !txTo.witness.vtxinwit[inpos].scriptWitness.IsNull()) {
+
+            //If m_spent_outputs_ready (the spent_outputs are eq to txTo's input size) AND the spk of the input is 2 + taproot size, AND the spk has a 1 in the beginning indicating taproot (witness version 1)
             if (m_spent_outputs_ready && m_spent_outputs[inpos].scriptPubKey.size() == 2 + WITNESS_V1_TAPROOT_SIZE &&
                 m_spent_outputs[inpos].scriptPubKey[0] == OP_1) {
+
+                //E
                 // Treat every witness-bearing spend with 34-byte scriptPubKey that starts with OP_1 as a Taproot
                 // spend. This only works if spent_outputs was provided as well, but if it wasn't, actual validation
                 // will fail anyway. Note that this branch may trigger for scriptPubKeys that aren't actually segwit
                 // but in that case validation will fail as SCRIPT_ERR_WITNESS_UNEXPECTED anyway.
+                //EE
+
+                //Set BIP341 to true
                 uses_bip341_taproot = true;
             } else {
+
+                //E
                 // Treat every spend that's not known to native witness v1 as a Witness v0 spend. This branch may
                 // also be taken for unknown witness versions, but it is harmless, and being precise would require
                 // P2SH evaluation to find the redeemScript.
+                //EE
+
+                //Otherwise we must be using bip143, witness v0
                 uses_bip143_segwit = true;
             }
         }
-        if (uses_bip341_taproot && uses_bip143_segwit) break; // No need to scan further if we already need all.
+
+        //E
+        // No need to scan further if we already need all.
+        //EE
+
+        //If the inputs mix v0 AND v1 inputs, then break
+        if (uses_bip341_taproot && uses_bip143_segwit) break; 
     }
 
+    //If we have segwit inputs
     if (uses_bip143_segwit || uses_bip341_taproot) {
+        //E
         // Computations shared between both sighash schemes.
+        //EE
+
+        //Get the input prevouts hash
         m_prevouts_single_hash = GetPrevoutsSHA256(txTo);
+        //Get the input seq hash
         m_sequences_single_hash = GetSequencesSHA256(txTo);
+        //Get the outputs hashed
         m_outputs_single_hash = GetOutputsSHA256(txTo);
+        //get the issuance hash
         m_issuances_single_hash = GetIssuanceSHA256(txTo);
     }
+
+    //If we're using segwit
     if (uses_bip143_segwit) {
+
+        //compute more hashes for sighash
         hashPrevouts = SHA256Uint256(m_prevouts_single_hash);
         hashSequence = SHA256Uint256(m_sequences_single_hash);
         hashIssuance = SHA256Uint256(m_issuances_single_hash);
@@ -2588,10 +2635,19 @@ void PrecomputedTransactionData::Init(const T& txTo, std::vector<CTxOut>&& spent
         hashRangeproofs = GetRangeproofsHash(txTo);
         m_bip143_segwit_ready = true;
     }
+
+    //If we're using taproot and the outputs are ready (the spent_outputs are eq to txTo's input size)
     if (uses_bip341_taproot && m_spent_outputs_ready) {
+
+        //E
         // line copied from GetTransactionWeight() in src/consensus/validation.h
         // (we cannot directly use that function for type reasons)
+        //EE
+
+        //Get the tx weight
         m_tx_weight = ::GetSerializeSize(txTo, PROTOCOL_VERSION | SERIALIZE_TRANSACTION_NO_WITNESS) * (WITNESS_SCALE_FACTOR - 1) + ::GetSerializeSize(txTo, PROTOCOL_VERSION);
+
+        //get other values required by sighash 
         m_outpoints_flag_single_hash = GetOutpointFlagsSHA256(txTo);
         m_spent_asset_amounts_single_hash = GetSpentAssetsAmountsSHA256(m_spent_outputs);
         m_issuance_rangeproofs_single_hash = GetIssuanceRangeproofsSHA256(txTo);
@@ -2600,9 +2656,16 @@ void PrecomputedTransactionData::Init(const T& txTo, std::vector<CTxOut>&& spent
         m_spent_output_spk_single_hashes = GetSpentScriptPubKeysSHA256(m_spent_outputs);
         m_output_spk_single_hashes = GetOutputScriptPubKeysSHA256(txTo);
 
+        //Get the raw annex as a buffer by passing in the ize of the witnesses
         std::vector<rawBuffer> simplicityRawAnnex(txTo.witness.vtxinwit.size());
+
+        //Get the input size in simplicity
         std::vector<rawInput> simplicityRawInput(txTo.vin.size());
+
+        //For every input, set some data in the 'simplicityRawInput' data object that will be passed into simplicity execution
         for (size_t i = 0; i < txTo.vin.size(); ++i) {
+
+            //CHECKPOINT
             simplicityRawInput[i].prevTxid = txTo.vin[i].prevout.hash.begin();
             simplicityRawInput[i].prevIx = txTo.vin[i].prevout.n;
             simplicityRawInput[i].sequence = txTo.vin[i].nSequence;

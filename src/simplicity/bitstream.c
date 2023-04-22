@@ -181,18 +181,44 @@ static int32_t decodeUpto65535(bitstream* stream) {
  *
  * Precondition: NULL != stream
  */
+
+//RANDY_COMMENTED
+//Read an indicator bit to see if it's 0, and if not then read an int from the bitstream,
+//and read as many bits of that int's value into another int. This could save room over varints
+//Where bytes need to be read in
 int32_t decodeUptoMaxInt(bitstream* stream) {
+
+  //Read the first bit from the bit stream
   int32_t bit = read1Bit(stream);
+
+  //If the bit is less than 0, return the bit
   if (bit < 0) return bit;
+
+  //If the bit is 0 return 1
   if (0 == bit) {
     return 1;
-  } else {
+  } 
+  //If the bit is above 0
+  else {
+    //Decode an int from the stream
     int32_t n = decodeUpto65535(stream);
+
+    //If it's negative return
     if (n < 0) return n;
+
+    //REVIEW  - the if statement doesn't need to be so close to the code block. 
+    //If it's above 30, error out
     if (30 < n) return SIMPLICITY_ERR_DATA_OUT_OF_RANGE;
     {
+      //If it's not above 30 then read n bits form the stream
       int32_t result = readNBits(n, stream);
+
+      //If the result is less than 0, return the result
       if (result < 0) return result;
+
+      //Otherwise shift 1 by n and 'or' with result
+      //Since the max n could be is 30, the max num is the 31st bit being on, 
+      //while the rest of the 30 bits that were read are 1
       return ((1 << n) | result);
     }
   }
