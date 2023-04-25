@@ -92,6 +92,7 @@ private:
     mutable Parents m_parents;
     mutable Children m_children;
     const CAmount nFee;             //!< Cached to avoid expensive parent-transaction lookups
+    const CAmount nPolicyAssetFee;
     const size_t nTxWeight;         //!< ... and avoid recomputing tx weight (also used for GetTxSize())
     const size_t nUsageSize;        //!< ... and total memory usage
     const int64_t nTime;            //!< Local time when entering the mempool
@@ -121,9 +122,15 @@ public:
                     int64_t nSigOpsCost, LockPoints lp,
                     const std::set<std::pair<uint256, COutPoint>>& setPeginsSpent);
 
+    CTxMemPoolEntry(const CTransactionRef& _tx, const CAmount& _nFee, 
+                    const CAmount& _nPolicyAssetFee,
+                    int64_t _nTime, unsigned int _entryHeight,
+                    bool _spendsCoinbase, int64_t _sigOpsCost, LockPoints lp, const std::set<std::pair<uint256, COutPoint>>& _setPeginsSpent);
+
     const CTransaction& GetTx() const { return *this->tx; }
     CTransactionRef GetSharedTx() const { return this->tx; }
     const CAmount& GetFee() const { return nFee; }
+    const CAmount& GetPolicyAssetFee() const { return nPolicyAssetFee; }
     size_t GetTxSize() const;
     size_t GetTxWeight() const { return nTxWeight; }
     std::chrono::seconds GetTime() const { return std::chrono::seconds{nTime}; }

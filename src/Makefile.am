@@ -594,6 +594,7 @@ libbitcoin_common_a_SOURCES = \
   net_permissions.cpp \
   outputtype.cpp \
   policy/feerate.cpp \
+  policy/feeasset_policy.cpp \
   policy/policy.cpp \
   protocol.cpp \
   psbt.cpp \

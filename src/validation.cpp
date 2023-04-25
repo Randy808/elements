@@ -27,6 +27,7 @@
 #include <node/coinstats.h>
 #include <node/ui_interface.h>
 #include <pegins.h>
+#include <policy/feeasset_policy.h>
 #include <policy/policy.h>
 #include <policy/settings.h>
 #include <primitives/block.h>
@@ -772,8 +773,22 @@ bool MemPoolAccept::PreChecks(ATMPArgs& args, Workspace& ws)
 
     int64_t nSigOpsCost = GetTransactionSigOpCost(tx, m_view, STANDARD_SCRIPT_VERIFY_FLAGS);
 
-    // We only consider policyAsset
-    ws.m_base_fees = fee_map[policyAsset];
+    // const CAsset altPolicy = CAsset(uint256S("5f26d5fb6b2d8b47f479d6dcc5df80d003a0cf58cae85fa8a9cd92e53b89e9b3"));
+    CAsset chosenAsset = policyAsset;
+
+    CAmount largest_fee_asset_amount = 0;
+    // output the contents of the map
+    for (auto it = fee_map.begin(); it != fee_map.end(); ++it) {
+        // std::cout << it->first << " => " << it->second << '\n';
+        if(it->second > largest_fee_asset_amount){
+            chosenAsset = it->first;
+            largest_fee_asset_amount = it->second;
+        }
+    }
+
+    // We only consider policyAsset ; change this to pull the 'highest ranked fee asset' by policy not by policyAsset
+    // fee_map[policyAsset] = 0;
+    ws.m_base_fees = fee_map[chosenAsset];
 
     // nModifiedFees includes any fee deltas from PrioritiseTransaction
     nModifiedFees = ws.m_base_fees;
@@ -794,7 +809,8 @@ bool MemPoolAccept::PreChecks(ATMPArgs& args, Workspace& ws)
         }
     }
 
-    entry.reset(new CTxMemPoolEntry(ptx, ws.m_base_fees, nAcceptTime, m_active_chainstate.m_chain.Height(),
+    //when does this entry get used? After our altpolicy feemap calculation at leaast
+    entry.reset(new CTxMemPoolEntry(ptx, ws.m_base_fees, fee_map[policyAsset], nAcceptTime, m_active_chainstate.m_chain.Height(),
             fSpendsCoinbase, nSigOpsCost, lp, setPeginsSpent));
     unsigned int nSize = entry->GetTxSize();
 

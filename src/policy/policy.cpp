@@ -16,6 +16,7 @@
 
 // ELEMENTS:
 CAsset policyAsset;
+CAsset altPolicyAsset;
 
 CAmount GetDustThreshold(const CTxOut& txout, const CFeeRate& dustRelayFeeIn)
 {

@@ -139,6 +139,7 @@ private:
     uint64_t nBlockTx;
     uint64_t nBlockSigOpsCost;
     CAmount nFees;
+    CAmount nPolicyAssetFees;
     CTxMemPool::setEntries inBlock;
 
     // Chain context for the block

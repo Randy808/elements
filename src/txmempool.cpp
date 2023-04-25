@@ -26,7 +26,26 @@
 CTxMemPoolEntry::CTxMemPoolEntry(const CTransactionRef& _tx, const CAmount& _nFee,
                                  int64_t _nTime, unsigned int _entryHeight,
                                  bool _spendsCoinbase, int64_t _sigOpsCost, LockPoints lp, const std::set<std::pair<uint256, COutPoint>>& _setPeginsSpent)
-    : tx(_tx), nFee(_nFee), nTxWeight(GetTransactionWeight(*tx)), nUsageSize(RecursiveDynamicUsage(tx)), nTime(_nTime), entryHeight(_entryHeight),
+    : tx(_tx), nFee(_nFee), nPolicyAssetFee(0), nTxWeight(GetTransactionWeight(*tx)), nUsageSize(RecursiveDynamicUsage(tx)), nTime(_nTime), entryHeight(_entryHeight),
+    spendsCoinbase(_spendsCoinbase), sigOpCost(_sigOpsCost), lockPoints(lp),
+    setPeginsSpent(_setPeginsSpent)
+{
+    nCountWithDescendants = 1;
+    nSizeWithDescendants = GetTxSize();
+    nModFeesWithDescendants = nFee;
+
+    feeDelta = 0;
+
+    nCountWithAncestors = 1;
+    nSizeWithAncestors = GetTxSize();
+    nModFeesWithAncestors = nFee;
+    nSigOpCostWithAncestors = sigOpCost;
+}
+
+CTxMemPoolEntry::CTxMemPoolEntry(const CTransactionRef& _tx, const CAmount& _nFee, const CAmount& _nPolicyAssetFee,
+                                 int64_t _nTime, unsigned int _entryHeight,
+                                 bool _spendsCoinbase, int64_t _sigOpsCost, LockPoints lp, const std::set<std::pair<uint256, COutPoint>>& _setPeginsSpent)
+    : tx(_tx), nFee(_nFee), nPolicyAssetFee(_nPolicyAssetFee), nTxWeight(GetTransactionWeight(*tx)), nUsageSize(RecursiveDynamicUsage(tx)), nTime(_nTime), entryHeight(_entryHeight),
     spendsCoinbase(_spendsCoinbase), sigOpCost(_sigOpsCost), lockPoints(lp),
     setPeginsSpent(_setPeginsSpent)
 {

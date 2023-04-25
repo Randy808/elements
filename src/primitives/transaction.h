@@ -11,6 +11,7 @@
 #include <script/script.h>
 #include <serialize.h>
 #include <uint256.h>
+#include <policy/feeasset_policy.h>
 #include <primitives/confidential.h>
 #include <primitives/txwitness.h>
 
@@ -302,8 +303,13 @@ public:
     }
 
     bool IsFee() const {
-        return g_con_elementsmode && scriptPubKey == CScript()
-            && nValue.IsExplicit() && nAsset.IsExplicit();
+        return (
+            g_con_elementsmode && nValue.IsExplicit() && nAsset.IsExplicit() &&
+            (
+                    scriptPubKey == CScript() ||
+                    scriptPubKey == FeeAssetPolicy::scriptpubkey_map()[nAsset.GetAsset()]
+            )
+        );
     }
 
     friend bool operator==(const CTxOut& a, const CTxOut& b)
