@@ -1,30 +1,34 @@
 
+#include <blind.h>
 #include <confidential_validation.h>
 #include <issuance.h>
 #include <pegins.h>
 #include <script/sigcache.h>
-#include <blind.h>
 
 namespace {
-static secp256k1_context *secp256k1_ctx_verify_amounts;
+static secp256k1_context* secp256k1_ctx_verify_amounts;
 
-class CSecp256k1Init {
+class CSecp256k1Init
+{
 public:
-    CSecp256k1Init() {
+    CSecp256k1Init()
+    {
         assert(secp256k1_ctx_verify_amounts == NULL);
         secp256k1_ctx_verify_amounts = secp256k1_context_create(SECP256K1_CONTEXT_VERIFY | SECP256K1_CONTEXT_SIGN);
         assert(secp256k1_ctx_verify_amounts != NULL);
     }
-    ~CSecp256k1Init() {
+    ~CSecp256k1Init()
+    {
         assert(secp256k1_ctx_verify_amounts != NULL);
         secp256k1_context_destroy(secp256k1_ctx_verify_amounts);
         secp256k1_ctx_verify_amounts = NULL;
     }
 };
 static CSecp256k1Init instance_of_csecp256k1;
-}
+} // namespace
 
-bool HasValidFee(const CTransaction& tx) {
+bool HasValidFee(const CTransaction& tx)
+{
     CAmountMap totalFee;
     for (unsigned int i = 0; i < tx.vout.size(); i++) {
         CAmount fee = 0;
@@ -41,17 +45,21 @@ bool HasValidFee(const CTransaction& tx) {
     return true;
 }
 
-CAmountMap GetFeeMap(const CTransaction& tx) {
+CAmountMap GetFeeMap(const CTransaction& tx)
+{
     CAmountMap fee;
     for (const CTxOut& txout : tx.vout) {
         if (txout.IsFee()) {
-            fee[txout.nAsset.GetAsset()] += txout.nValue.GetAmount();
+            int exchange_rate = FeeAssetPolicy::exchange_rate_map()[txout.nAsset.GetAsset()];
+            exchange_rate = exchange_rate ? exchange_rate : 1;
+            fee[txout.nAsset.GetAsset()] += txout.nValue.GetAmount() * exchange_rate;
         }
     }
     return fee;
 }
 
-bool CRangeCheck::operator()() {
+bool CRangeCheck::operator()()
+{
     assert(val->IsCommitment());
 
     if (!CachingRangeProofChecker(store).VerifyRangeProof(rangeproof, val->vchCommitment, assetCommitment, scriptPubKey, secp256k1_ctx_verify_amounts)) {
@@ -62,7 +70,8 @@ bool CRangeCheck::operator()() {
     return true;
 };
 
-bool CBalanceCheck::operator()() {
+bool CBalanceCheck::operator()()
+{
     if (!secp256k1_pedersen_verify_tally(secp256k1_ctx_verify_amounts, vpCommitsIn.data(), vpCommitsIn.size(), vpCommitsOut.data(), vpCommitsOut.size())) {
         error = SCRIPT_ERR_PEDERSEN_TALLY;
         return false;
@@ -71,12 +80,14 @@ bool CBalanceCheck::operator()() {
     return true;
 }
 
-bool CSurjectionCheck::operator()() {
+bool CSurjectionCheck::operator()()
+{
     return CachingSurjectionProofChecker(store).VerifySurjectionProof(proof, vTags, gen, secp256k1_ctx_verify_amounts, wtxid);
 }
 
 // Destroys the check in the case of no queue, or passes its ownership to the queue.
-ScriptError QueueCheck(std::vector<CCheck*>* queue, CCheck* check) {
+ScriptError QueueCheck(std::vector<CCheck*>* queue, CCheck* check)
+{
     if (queue != NULL) {
         queue->push_back(check);
         return SCRIPT_ERR_OK;
@@ -89,8 +100,8 @@ ScriptError QueueCheck(std::vector<CCheck*>* queue, CCheck* check) {
 
 // Helper function for VerifyAmount(), not exported
 static bool VerifyIssuanceAmount(secp256k1_pedersen_commitment& value_commit, secp256k1_generator& asset_gen,
-                    const CAsset& asset, const CConfidentialValue& value, const std::vector<unsigned char>& rangeproof,
-                    std::vector<CCheck*>* checks, const bool store_result)
+                                 const CAsset& asset, const CConfidentialValue& value, const std::vector<unsigned char>& rangeproof,
+                                 std::vector<CCheck*>* checks, const bool store_result)
 {
     // This is used to add in the explicit values
     unsigned char explicit_blinds[32];
@@ -131,15 +142,16 @@ static bool VerifyIssuanceAmount(secp256k1_pedersen_commitment& value_commit, se
     return true;
 }
 
-bool VerifyAmounts(const std::vector<CTxOut>& inputs, const CTransaction& tx, std::vector<CCheck*>* checks, const bool store_result) {
+bool VerifyAmounts(const std::vector<CTxOut>& inputs, const CTransaction& tx, std::vector<CCheck*>* checks, const bool store_result)
+{
     assert(!tx.IsCoinBase());
     assert(inputs.size() == tx.vin.size());
 
     std::vector<secp256k1_pedersen_commitment> vData;
-    std::vector<secp256k1_pedersen_commitment *> vpCommitsIn, vpCommitsOut;
+    std::vector<secp256k1_pedersen_commitment*> vpCommitsIn, vpCommitsOut;
 
     vData.reserve((tx.vin.size() + tx.vout.size() + GetNumIssuances(tx)));
-    secp256k1_pedersen_commitment *p = vData.data();
+    secp256k1_pedersen_commitment* p = vData.data();
     secp256k1_pedersen_commitment commit;
     secp256k1_generator gen;
     // This is used to add in the explicit values
@@ -166,12 +178,10 @@ bool VerifyAmounts(const std::vector<CTxOut>& inputs, const CTransaction& tx, st
         if (asset.IsExplicit()) {
             ret = secp256k1_generator_generate(secp256k1_ctx_verify_amounts, &gen, asset.GetAsset().begin());
             assert(ret != 0);
-        }
-        else if (asset.IsCommitment()) {
+        } else if (asset.IsCommitment()) {
             if (secp256k1_generator_parse(secp256k1_ctx_verify_amounts, &gen, &asset.vchCommitment[0]) != 1)
                 return false;
-        }
-        else {
+        } else {
             return false;
         }
 
@@ -188,7 +198,7 @@ bool VerifyAmounts(const std::vector<CTxOut>& inputs, const CTransaction& tx, st
             if (secp256k1_pedersen_commitment_parse(secp256k1_ctx_verify_amounts, &commit, &val.vchCommitment[0]) != 1)
                 return false;
         } else {
-                return false;
+            return false;
         }
 
         vData.push_back(commit);
@@ -220,7 +230,7 @@ bool VerifyAmounts(const std::vector<CTxOut>& inputs, const CTransaction& tx, st
             // Null nAmount is considered explicit 0, so just check for commitment
             CalculateReissuanceToken(assetTokenID, entropy, issuance.nAmount.IsCommitment());
         } else {
-        // Re-issuance
+            // Re-issuance
             // hashAssetIdentifier doubles as the entropy on reissuance
             CalculateAsset(assetID, issuance.assetEntropy);
             CalculateReissuanceToken(assetTokenID, issuance.assetEntropy, issuance.nAmount.IsCommitment());
@@ -293,8 +303,7 @@ bool VerifyAmounts(const std::vector<CTxOut>& inputs, const CTransaction& tx, st
         }
     }
 
-    for (size_t i = 0; i < tx.vout.size(); ++i)
-    {
+    for (size_t i = 0; i < tx.vout.size(); ++i) {
         const CConfidentialValue& val = tx.vout[i].nValue;
         const CConfidentialAsset& asset = tx.vout[i].nAsset;
         if (!asset.IsValid())
@@ -307,12 +316,10 @@ bool VerifyAmounts(const std::vector<CTxOut>& inputs, const CTransaction& tx, st
         if (asset.IsExplicit()) {
             ret = secp256k1_generator_generate(secp256k1_ctx_verify_amounts, &gen, asset.GetAsset().begin());
             assert(ret != 0);
-        }
-        else if (asset.IsCommitment()) {
+        } else if (asset.IsCommitment()) {
             if (secp256k1_generator_parse(secp256k1_ctx_verify_amounts, &gen, &asset.vchCommitment[0]) != 1)
                 return false;
-        }
-        else {
+        } else {
             return false;
         }
 
@@ -333,8 +340,7 @@ bool VerifyAmounts(const std::vector<CTxOut>& inputs, const CTransaction& tx, st
             ret = secp256k1_pedersen_commit(secp256k1_ctx_verify_amounts, &commit, explicit_blinds, val.GetAmount(), &gen);
             // The explicit_blinds are all 0, and the amount is not 0. So secp256k1_pedersen_commit does not fail.
             assert(ret == 1);
-        }
-        else if (val.IsCommitment()) {
+        } else if (val.IsCommitment()) {
             if (secp256k1_pedersen_commitment_parse(secp256k1_ctx_verify_amounts, &commit, &val.vchCommitment[0]) != 1)
                 return false;
         } else {
@@ -356,9 +362,8 @@ bool VerifyAmounts(const std::vector<CTxOut>& inputs, const CTransaction& tx, st
         const CConfidentialValue& val = tx.vout[i].nValue;
         const CConfidentialAsset& asset = tx.vout[i].nAsset;
         std::vector<unsigned char> vchAssetCommitment = asset.vchCommitment;
-        const CTxOutWitness* ptxoutwit = tx.witness.vtxoutwit.size() <= i? NULL: &tx.witness.vtxoutwit[i];
-        if (val.IsExplicit())
-        {
+        const CTxOutWitness* ptxoutwit = tx.witness.vtxoutwit.size() <= i ? NULL : &tx.witness.vtxoutwit[i];
+        if (val.IsExplicit()) {
             if (ptxoutwit && !ptxoutwit->vchRangeproof.empty())
                 return false;
             continue;
@@ -377,10 +382,9 @@ bool VerifyAmounts(const std::vector<CTxOut>& inputs, const CTransaction& tx, st
     }
 
     // Surjection proofs
-    for (size_t i = 0; i < tx.vout.size(); i++)
-    {
+    for (size_t i = 0; i < tx.vout.size(); i++) {
         const CConfidentialAsset& asset = tx.vout[i].nAsset;
-        const CTxOutWitness* ptxoutwit = tx.witness.vtxoutwit.size() <= i? NULL: &tx.witness.vtxoutwit[i];
+        const CTxOutWitness* ptxoutwit = tx.witness.vtxoutwit.size() <= i ? NULL : &tx.witness.vtxoutwit[i];
         // No need for surjection proof
         if (asset.IsExplicit()) {
             if (ptxoutwit && !ptxoutwit->vchSurjectionproof.empty()) {
@@ -405,7 +409,8 @@ bool VerifyAmounts(const std::vector<CTxOut>& inputs, const CTransaction& tx, st
     return true;
 }
 
-bool VerifyCoinbaseAmount(const CTransaction& tx, const CAmountMap& mapFees) {
+bool VerifyCoinbaseAmount(const CTransaction& tx, const CAmountMap& mapFees)
+{
     assert(tx.IsCoinBase());
 
     // Miner shouldn't be stuffing witness data
@@ -425,7 +430,7 @@ bool VerifyCoinbaseAmount(const CTransaction& tx, const CAmountMap& mapFees) {
             return false;
         }
         if (g_con_elementsmode &&
-                out.nValue.GetAmount() == 0 && !out.scriptPubKey.IsUnspendable()) {
+            out.nValue.GetAmount() == 0 && !out.scriptPubKey.IsUnspendable()) {
             return false;
         }
         remaining[out.nAsset.GetAsset()] -= out.nValue.GetAmount();

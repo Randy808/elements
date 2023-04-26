@@ -776,19 +776,15 @@ bool MemPoolAccept::PreChecks(ATMPArgs& args, Workspace& ws)
     // const CAsset altPolicy = CAsset(uint256S("5f26d5fb6b2d8b47f479d6dcc5df80d003a0cf58cae85fa8a9cd92e53b89e9b3"));
     CAsset chosenAsset = policyAsset;
 
-    CAmount largest_fee_asset_amount = 0;
+    CAmount fee_sum = 0;
     // output the contents of the map
     for (auto it = fee_map.begin(); it != fee_map.end(); ++it) {
-        // std::cout << it->first << " => " << it->second << '\n';
-        if(it->second > largest_fee_asset_amount){
-            chosenAsset = it->first;
-            largest_fee_asset_amount = it->second;
-        }
+        fee_sum+=it->second;
     }
 
     // We only consider policyAsset ; change this to pull the 'highest ranked fee asset' by policy not by policyAsset
     // fee_map[policyAsset] = 0;
-    ws.m_base_fees = fee_map[chosenAsset];
+    ws.m_base_fees = fee_sum;
 
     // nModifiedFees includes any fee deltas from PrioritiseTransaction
     nModifiedFees = ws.m_base_fees;
